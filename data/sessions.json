@@ -62,5 +62,13 @@
       "https://github.com/xhcarina/superset/pull/12"
     ],
     "open_bugs_at_time": 12
+  },
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 5,
+    "issue_title": "Delete doesn't refresh Recent Activity",
+    "session_url": "https://app.devin.ai/sessions/309393a264dd45daae62681e76ed4077",
+    "session_id": "309393a264dd45daae62681e76ed4077",
+    "timestamp": "2026-04-20T22:50:50.367265+00:00"
   }
 ]
