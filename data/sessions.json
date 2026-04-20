@@ -1,0 +1,66 @@
+[
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 2,
+    "issue_title": "Delete chart doesn't refresh home page",
+    "session_url": "https://app.devin.ai/sessions/d68a4d4a5e0c4e02b71825ed0ce4c9da",
+    "session_id": "d68a4d4a5e0c4e02b71825ed0ce4c9da",
+    "timestamp": "2026-04-20T04:16:54.073042+00:00",
+    "outcome": "pr_opened",
+    "ttr_hours": 4.915,
+    "cost": 1.8,
+    "acus": 4.0,
+    "pr_urls": [
+      "https://github.com/xhcarina/superset/pull/9"
+    ],
+    "open_bugs_at_time": 1
+  },
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 1,
+    "issue_title": "Infinite chart reload in nested tabs",
+    "session_url": "https://app.devin.ai/sessions/0153e6723abb4596b45f1adf3f318c48",
+    "session_id": "0153e6723abb4596b45f1adf3f318c48",
+    "timestamp": "2026-04-20T05:20:07.692911+00:00",
+    "outcome": "pr_opened",
+    "ttr_hours": 5.621111111111111,
+    "cost": 2.12,
+    "acus": 4.7,
+    "pr_urls": [
+      "https://github.com/xhcarina/superset/pull/10"
+    ],
+    "open_bugs_at_time": 1
+  },
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 3,
+    "issue_title": "Legend margin broken on radar charts",
+    "session_url": "https://app.devin.ai/sessions/827857d41d8b4a9db880b2cc0a32ac1a",
+    "session_id": "827857d41d8b4a9db880b2cc0a32ac1a",
+    "timestamp": "2026-04-20T22:13:12.350731+00:00",
+    "outcome": "pr_opened",
+    "ttr_hours": 22.52611111111111,
+    "cost": 1.62,
+    "acus": 3.6,
+    "pr_urls": [
+      "https://github.com/xhcarina/superset/pull/11"
+    ],
+    "open_bugs_at_time": 11
+  },
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 4,
+    "issue_title": "Logo double-prefixed in subdirectory deploy",
+    "session_url": "https://app.devin.ai/sessions/6c191d5df37d4198a5fc1b58c8a5e59b",
+    "session_id": "6c191d5df37d4198a5fc1b58c8a5e59b",
+    "timestamp": "2026-04-20T22:23:39.157597+00:00",
+    "outcome": "pr_opened",
+    "ttr_hours": 22.795833333333334,
+    "cost": 3.42,
+    "acus": 7.6,
+    "pr_urls": [
+      "https://github.com/xhcarina/superset/pull/12"
+    ],
+    "open_bugs_at_time": 12
+  }
+]
