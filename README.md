@@ -33,7 +33,6 @@ Flow B — Manual CLI (two-step)
 python cli.py scope <N>       # Devin analyzes issue → confidence score + action plan
 python cli.py fix <N>         # Devin implements the fix using the scoped action plan
 
-Or skip the CLI entirely: label any issue "devin-fix" and watch Flow A run automatically.
 ```
 
 **Hosted on HuggingFace** — evaluators need only a CLI + 3 env vars. No local infra, no Devin API access required.
@@ -46,7 +45,17 @@ Or skip the CLI entirely: label any issue "devin-fix" and watch Flow A run autom
 
 ## Quick Start (evaluators)
 
-The service is already running at `https://xhcarina-devintakehome.hf.space`. You only need the CLI:
+The service is already running at `https://xhcarina-devintakehome.hf.space`.
+
+### Flow A — GitHub App (label-based, fully automatic)
+
+1. Install the GitHub App on your repo: [Install Devin Remediation App](https://github.com/apps/devintakehome/installations/new)
+2. Add the label `devin-fix` to any issue
+3. The webhook fires automatically → Devin fixes it → PR opened → metrics posted as a comment
+
+No CLI or credentials needed.
+
+### Flow B — Manual CLI (two-step)
 
 ```bash
 # 1. Get the CLI
@@ -121,8 +130,6 @@ Seven issues created in [`xhcarina/superset`](https://github.com/xhcarina/supers
 
 ```
 cli.py                        # CLI client (Flow B)
-.github/workflows/
-  devin-remediation.yml       # Fallback: label trigger via GitHub Actions
 orchestrator/
   app.py                      # FastAPI: /remediate /scope /scope/result /issues /metrics /health /webhook
   scope.py                    # Devin analysis → confidence score + action plan (structured output)
