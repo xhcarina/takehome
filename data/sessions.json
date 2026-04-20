@@ -69,6 +69,14 @@
     "issue_title": "Delete doesn't refresh Recent Activity",
     "session_url": "https://app.devin.ai/sessions/309393a264dd45daae62681e76ed4077",
     "session_id": "309393a264dd45daae62681e76ed4077",
-    "timestamp": "2026-04-20T22:50:50.367265+00:00"
+    "timestamp": "2026-04-20T22:50:50.367265+00:00",
+    "outcome": "pr_opened",
+    "ttr_hours": 23.279722222222222,
+    "cost": 4.05,
+    "acus": 9.0,
+    "pr_urls": [
+      "https://github.com/xhcarina/superset/pull/13"
+    ],
+    "open_bugs_at_time": 13
   }
 ]
