@@ -78,5 +78,13 @@
       "https://github.com/xhcarina/superset/pull/13"
     ],
     "open_bugs_at_time": 13
+  },
+  {
+    "repo": "xhcarina/superset",
+    "issue_number": 1,
+    "issue_title": "Infinite chart reload in nested tabs",
+    "session_url": "https://app.devin.ai/sessions/a14efb0fd6ed4c31972db02465a04dbc",
+    "session_id": "a14efb0fd6ed4c31972db02465a04dbc",
+    "timestamp": "2026-04-20T23:54:03.999797+00:00"
   }
 ]
