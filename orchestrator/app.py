@@ -37,11 +37,6 @@ def _resume_pending_sessions():
         print(f"[startup] resuming {len(pending)} pending session(s)")
         for s in pending:
             session_id = s["session_id"]
-            os.environ["REPO"] = s.get("repo", "")
-            os.environ["ISSUE_NUMBER"] = str(s.get("issue_number", ""))
-            os.environ["ISSUE_TITLE"] = s.get("issue_title", "")
-            os.environ["ISSUE_BODY"] = s.get("issue_body", "")
-            os.environ["ACTION_PLAN"] = s.get("action_plan", "")
 
             def _resume(sid=session_id):
                 try:
@@ -98,7 +93,7 @@ def list_issues(repo: str, label: str = "devin-fix", request: Request = None):
     _check_auth(request)
     if not os.environ.get("GH_TOKEN"):
         raise HTTPException(status_code=500, detail="GH_TOKEN not configured")
-    from github_client import list_open_issues
+    from remediate import list_open_issues
     issues = list_open_issues(repo, label=label if label else None)
     result = []
     from store import get_scope
@@ -131,10 +126,10 @@ def trigger_scope(body: ScopeRequest, request: Request):
     try:
         session = create_session(
             title=f"Scope #{body.issue_number}: {(body.issue_title or '')[:80]}",
-            prompt=_scope_mod._build_prompt(body.issue_title or "", body.issue_body or "", repo_url),
+            prompt=_scope_mod.build_prompt(body.issue_title or "", body.issue_body or "", repo_url),
             tags=["scope", "triage"],
             max_acu=15,
-            structured_output_schema=_scope_mod._SCHEMA,
+            structured_output_schema=_scope_mod.SCHEMA,
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Devin API error: {e}")
@@ -177,7 +172,7 @@ def trigger_remediate(body: RemediateRequest, request: Request):
     import remediate as _rem
     from devin_client import create_session
     from store import upsert_session
-    from github_client import post_comment
+    from remediate import post_comment
 
     repo_url = f"https://github.com/{body.repo}"
     session = create_session(
@@ -204,6 +199,74 @@ def trigger_remediate(body: RemediateRequest, request: Request):
     threading.Thread(target=_run, daemon=True).start()
     return {"status": "started", "issue_number": body.issue_number, "session_url": session_url}
 
+
+
+def _handle_pr_opened(repo: str, pr_url: str, pr_body: str) -> None:
+    """Match a Devin-opened PR to its issue, compute TTR + cost, post metrics comment."""
+    import re
+    import time
+    from store import get_pending_sessions, upsert_session, get_summary
+    from devin_client import get_session, extract_acus
+    from remediate import post_comment, list_open_issues
+    from ttr import get_issue_created_at, get_pr_created_at, compute_ttr, get_historical_avg_ttr, compute_cost, build_metrics_table
+
+    try:
+        time.sleep(60)  # wait for ACUs to finalize
+
+        match = re.search(r"devin\.ai/sessions/([\w-]+)", pr_body)
+        session_id = match.group(1) if match else None
+
+        pending = []
+        if session_id:
+            pending = [s for s in get_pending_sessions() if s.get("session_id") == session_id]
+        if not pending:
+            issue_match = re.search(r"(?:fixes|closes|resolves)\s+#(\d+)", pr_body, re.IGNORECASE)
+            if issue_match:
+                ref_number = int(issue_match.group(1))
+                pending = [s for s in get_pending_sessions()
+                           if s.get("repo") == repo and s.get("issue_number") == ref_number]
+        if not pending:
+            print("[webhook/pr] could not match PR to a pending session")
+            return
+
+        ctx = pending[0]
+        session_id = session_id or ctx.get("session_id")
+        issue_number = ctx["issue_number"]
+
+        final_session = get_session(session_id)
+        acus = extract_acus(final_session)
+        cost = compute_cost(acus)
+
+        ttr, baseline = None, None
+        try:
+            ttr = compute_ttr(get_issue_created_at(repo, issue_number), get_pr_created_at(pr_url))
+            baseline = get_historical_avg_ttr("apache/superset")
+        except Exception as e:
+            print(f"[webhook/pr] ttr error (non-fatal): {e}")
+
+        open_bugs = issues_fixed = total_cost_to_date = None
+        try:
+            open_bugs = len(list_open_issues(repo, label=None))
+            summary = get_summary()
+            issues_fixed = summary["issues_fixed"]
+            total_cost_to_date = summary["total_cost"]
+        except Exception:
+            pass
+
+        metrics_table = build_metrics_table(
+            acus=acus, cost=cost, ttr=ttr, baseline=baseline,
+            open_bugs=open_bugs, issues_fixed=issues_fixed,
+            total_cost_to_date=total_cost_to_date,
+        )
+        post_comment(repo, issue_number,
+                     f"✅ **Devin opened a PR.**\n\n- {pr_url}{metrics_table}\n\nPlease review and merge when ready.")
+        upsert_session(session_id, {
+            "outcome": "pr_opened", "ttr_hours": ttr, "cost": cost,
+            "acus": acus, "pr_urls": [pr_url], "open_bugs_at_time": open_bugs,
+        })
+        print(f"[webhook/pr] metrics posted for issue #{issue_number}")
+    except Exception as e:
+        print(f"[webhook/pr] failed: {e}")
 
 
 @app.post("/webhook")
@@ -241,112 +304,12 @@ async def github_webhook(request: Request):
 
     if event == "pull_request" and payload.get("action") == "opened":
         pr = payload["pull_request"]
-        # Only handle PRs opened by Devin
         login = (pr.get("user") or {}).get("login", "")
         if "devin" in login.lower():
             repo = payload["repository"]["full_name"]
             pr_url = pr["html_url"]
             pr_body = pr.get("body") or ""
-
-            def _post_metrics(repo=repo, pr_url=pr_url, pr_body=pr_body):
-                try:
-                    import re
-                    import remediate
-                    from store import get_pending_sessions, upsert_session
-                    from devin_client import get_session, extract_pr_urls, extract_acus
-                    from github_client import post_comment, list_open_issues
-                    from metrics import (get_issue_created_at, get_pr_created_at,
-                                         compute_ttr, get_historical_avg_ttr,
-                                         compute_cost, format_duration)
-                    from store import get_summary
-
-                    # Wait for ACUs to finalize before fetching session data
-                    import time as _time
-                    _time.sleep(60)
-
-                    # Find session_id from PR body
-                    match = re.search(r"devin\.ai/sessions/([\w-]+)", pr_body)
-                    session_id = match.group(1) if match else None
-
-                    # Find linked issue from store — by session_id or by issue ref in PR body
-                    pending = []
-                    if session_id:
-                        pending = [s for s in get_pending_sessions()
-                                   if s.get("session_id") == session_id]
-                    if not pending:
-                        # Fall back: match "Fixes #N" / "Closes #N" in PR body
-                        issue_match = re.search(r"(?:fixes|closes|resolves)\s+#(\d+)", pr_body, re.IGNORECASE)
-                        if issue_match:
-                            ref_number = int(issue_match.group(1))
-                            pending = [s for s in get_pending_sessions()
-                                       if s.get("repo") == repo and s.get("issue_number") == ref_number]
-                    if not pending:
-                        print("[webhook/pr] could not match PR to a pending session")
-                        return
-                    ctx = pending[0]
-                    session_id = session_id or ctx.get("session_id")
-                    issue_number = ctx["issue_number"]
-
-                    # Fetch session for ACUs
-                    final_session = get_session(session_id)
-                    acus = extract_acus(final_session)
-                    cost = compute_cost(acus)
-
-                    # TTR
-                    ttr, baseline = None, None
-                    try:
-                        issue_dt = get_issue_created_at(repo, issue_number)
-                        pr_dt = get_pr_created_at(pr_url)
-                        ttr = compute_ttr(issue_dt, pr_dt)
-                        baseline = get_historical_avg_ttr("apache/superset")
-                    except Exception as e:
-                        print(f"[webhook/pr] metrics error (non-fatal): {e}")
-
-                    metrics_lines = [
-                        f"| ACUs consumed | `{acus}` |",
-                        f"| Estimated cost | `${cost:.2f}` |",
-                        f"| Time-to-resolution | `{format_duration(ttr)}` |",
-                    ]
-                    if baseline is not None:
-                        metrics_lines.append(
-                            f"| Human avg TTR (apache/superset) | `{format_duration(baseline)}` |")
-                        if ttr and baseline > 0:
-                            metrics_lines.append(
-                                f"| Speedup | `{baseline/ttr:.1f}×` |")
-                    try:
-                        open_bugs = len(list_open_issues(repo, label=None))
-                        summary = get_summary()
-                        metrics_lines += [
-                            f"| Total open issues | `{open_bugs}` |",
-                            f"| Total fixed by Devin | `{summary['issues_fixed']}` |",
-                            f"| Total cost to date | `${summary['total_cost']:.2f}` |",
-                        ]
-                    except Exception:
-                        pass
-
-                    metrics_table = (
-                        "\n\n**Metrics**\n\n| | |\n|---|---|\n"
-                        + "\n".join(metrics_lines)
-                    )
-                    comment = (
-                        f"✅ **Devin opened a PR.**\n\n- {pr_url}"
-                        f"{metrics_table}\n\nPlease review and merge when ready."
-                    )
-                    post_comment(repo, issue_number, comment)
-
-                    upsert_session(session_id, {
-                        "outcome": "pr_opened",
-                        "ttr_hours": ttr,
-                        "cost": cost,
-                        "acus": acus,
-                        "pr_urls": [pr_url],
-                        "open_bugs_at_time": open_bugs if 'open_bugs' in dir() else None,
-                    })
-                    print(f"[webhook/pr] metrics posted for issue #{issue_number}")
-                except Exception as e:
-                    print(f"[webhook/pr] failed: {e}")
-
-            threading.Thread(target=_post_metrics, daemon=True).start()
+            threading.Thread(target=_handle_pr_opened, args=(repo, pr_url, pr_body), daemon=True).start()
             return {"status": "metrics_started"}
 
     return {"status": "ignored"}
@@ -398,8 +361,8 @@ def terminate_session_endpoint(session_id: str, request: Request):
 @app.get("/metrics")
 def get_metrics():
     from store import get_summary
-    from github_client import list_open_issues
-    from metrics import get_historical_avg_ttr
+    from remediate import list_open_issues
+    from ttr import get_historical_avg_ttr
     try:
         repo = os.environ.get("TARGET_REPO", "")
         open_bugs = len(list_open_issues(repo, label=None)) if repo else None

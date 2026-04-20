@@ -5,11 +5,11 @@ import re
 import sys
 
 from devin_client import create_session, poll_until_done, extract_acus, get_session_messages
-from github_client import post_comment
+from remediate import post_comment
 from store import upsert_scope
 
 
-_SCHEMA = {
+SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": ["confidence_score", "reasoning", "action_plan"],
@@ -21,7 +21,7 @@ _SCHEMA = {
 }
 
 
-def _build_prompt(issue_title: str, issue_body: str, repo_url: str) -> str:
+def build_prompt(issue_title: str, issue_body: str, repo_url: str) -> str:
     return f"""You are a senior security engineer performing issue triage.
 
 Repository: {repo_url}
@@ -112,10 +112,10 @@ def run(repo: str, issue_number: int, issue_title: str, issue_body: str) -> dict
     print(f"[scope] repo={repo} issue=#{issue_number}")
     session = create_session(
         title=f"Scope #{issue_number}: {issue_title[:80]}",
-        prompt=_build_prompt(issue_title, issue_body, repo_url),
+        prompt=build_prompt(issue_title, issue_body, repo_url),
         tags=["scope", "triage"],
         max_acu=15,
-        structured_output_schema=_SCHEMA,
+        structured_output_schema=SCHEMA,
     )
     session_id = session["session_id"]
     session_url = session.get("url", f"https://app.devin.ai/sessions/{session_id}")

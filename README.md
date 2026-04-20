@@ -129,18 +129,17 @@ Seven issues created in [`xhcarina/superset`](https://github.com/xhcarina/supers
 ## Repo Structure
 
 ```
-cli.py                        # CLI client (Flow B)
+cli.py                    # Flow B only — CLI client
 orchestrator/
-  app.py                      # FastAPI: /remediate /scope /scope/result /issues /metrics /health /webhook
-  scope.py                    # Devin analysis → confidence score + action plan (structured output)
-  remediate.py                # Devin fix → PR nudge → metrics comment
-  devin_client.py             # Devin API v3 wrapper
-  github_client.py            # GitHub REST API wrapper
-  metrics.py                  # TTR, cost, speedup computation
-  store.py                    # GitHub-backed JSON store (data/sessions.json, data/scopes.json)
+  app.py                  # Routes for both flows
+  remediate.py            # Fix engine + GitHub API helpers (both flows)
+  scope.py                # Confidence scoring + action plan (Flow B only)
+  devin_client.py         # Devin API v3 wrapper (shared)
+  ttr.py                  # Time-to-resolution computation + metrics table (shared)
+  store.py                # GitHub-backed JSON persistence (shared)
 data/
-  sessions.json               # Fix session history and metrics
-  scopes.json                 # Scope results (confidence scores, action plans)
-Dockerfile                    # Port 7860 for HuggingFace Spaces
+  sessions.json           # Fix session history and metrics
+  scopes.json             # Scope results (confidence scores, action plans)
+Dockerfile                # Port 7860 for HuggingFace Spaces
 requirements.txt
 ```
