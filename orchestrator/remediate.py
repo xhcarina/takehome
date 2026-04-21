@@ -159,7 +159,7 @@ def _finalize_session(repo, issue_number, session_id, session_url, final_session
 
 def run_from_session(repo: str, issue_number: int, issue_title: str,
                      session_id: str, session_url: str) -> None:
-    """Flow B entry point — poll an already-created session and post results."""
+    """poll an already-created session and post results."""
     attempts = 1
     final_session = None
 
@@ -195,7 +195,7 @@ def run_from_session(repo: str, issue_number: int, issue_title: str,
 
 
 def run():
-    """Flow A entry point — reads context from env vars set by the webhook handler."""
+    """reads context from env vars set by the webhook handler."""
     repo = os.environ["REPO"]
     issue_number = int(os.environ["ISSUE_NUMBER"])
     issue_title = os.environ["ISSUE_TITLE"]
